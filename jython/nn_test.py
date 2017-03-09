@@ -36,15 +36,15 @@ OUTPUT_LAYERS = 1    # DO NOT CHANGE OUTPUT_LAYERS!!!
 HIDDEN_LAYERS = [5]  # [nodes in hidden layer 1, nodes in hidden layer 2, ...]
 NUM_TRIALS = 5       # number of tests to run
 NUM_ITERATIONS = 100 # number of data points to train model
-SA_TEMP = 10000
-SA_COOL = 0.65
+SA_TEMP = 100
+SA_COOL = 0.90
 GA_POP  = 160
 GA_MATE = 20
 GA_MUT  = 20
 
 ## Test suites
 # These should be tailored for testing.
-ITERATION_SUITE = [2] + list(map(lambda x: 10**x, range(1, 4, 1)))
+ITERATION_SUITE = [2] + list(map(lambda x: 10**x, range(1, 5, 1)))
 TEMP_SUITE = list(map(lambda x: 10**x, range(-11, 10, 1)))
 COOL_SUITE = list(map(lambda x: x/100.0, range(0, 105, 5)))
 GA_POP_STE = range(20,220,20)
@@ -128,8 +128,12 @@ def nn_test(csv_in, oa_name=None,
       hidden_layers: [num_nodes_in_layer_1, num_nodes_in_layer_2, ...] 
         - list of the number of nodes in each hidden layer
       tst_lbl: str   - the label for this test
+      lvl_num: int or str
+        - indicates which level (or index) the test suite is in 
+          (eg. 10 is level 0 of ITERATION_SUITE = [10, 100, 1000])
       n_iter:  int   - number of data points to train with
-      sa_temp: int or float - the 'temperature' at which simulated annealing occurs
+      sa_temp: int or float 
+        - the 'temperature' at which simulated annealing occurs
       sa_cool: float - the amount of 'cooling' in simulated annealing; 0 <= sa_cool <= 1
       ga_pop:  int   - number of 'parents' to keep in each generation, in genetic algorithm
       ga_mate: int   - amount of crossover that occurs between parents, in genetic algorithm
