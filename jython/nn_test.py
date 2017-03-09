@@ -247,7 +247,7 @@ if __name__ == "__main__":
     with open("output_{}.csv".format(now), 'a') as f_out: # This file outputs to ../jython/ not to ../src/
         csvwriter = csv.writer(f_out)
         csvwriter.writerow(['test_name', 'level_num', 'trial_number',
-                            'oa_mame', 'num_iters', 
+                            'oa_name', 'num_iters', 
                             'sa_temp', 'sa_cool', 
                             'ga_pop', 'ga_mate', 'ga_mut',
                             'classification_pct', 'training_time'])
