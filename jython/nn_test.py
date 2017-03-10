@@ -22,7 +22,7 @@ import opt.SimulatedAnnealing as SimulatedAnnealing
 import opt.ga.StandardGeneticAlgorithm as StandardGeneticAlgorithm
 
 CSV_FILE = 'balance-scale.csv'
-CSV_HEADER = False
+CSV_HEADER = True
 # The .csv file must go in the ../src/opt/test/ folder
 # All data must be numeric.
 # All data must
@@ -30,26 +30,26 @@ CSV_HEADER = False
 #  in the final column.
 # If the .csv file has a header, change CSV_HEADER to True
 
-## Default values
+## Default values 
 # These should be tailored for your data.
 OUTPUT_LAYERS = 1    # DO NOT CHANGE OUTPUT_LAYERS!!!
-HIDDEN_LAYERS = [5]  # [nodes in hidden layer 1, nodes in hidden layer 2, ...]
-NUM_TRIALS = 5       # number of tests to run
-NUM_ITERATIONS = 100 # number of data points to train model
-SA_TEMP = 100
-SA_COOL = 0.90
-GA_POP  = 160
-GA_MATE = 20
-GA_MUT  = 20
+HIDDEN_LAYERS = [3, 3]  # [nodes in hidden layer 1, nodes in hidden layer 2, ...]
+NUM_TRIALS = 50       # number of times to run each test
+NUM_ITERATIONS = 200  # number of times neural network weights are updated
+SA_TEMP = 1E-10
+SA_COOL = 0.40
+GA_POP  = 40
+GA_MATE = 16
+GA_MUT  = 16   
 
 ## Test suites
 # These should be tailored for testing.
-ITERATION_SUITE = [2] + list(map(lambda x: 10**x, range(1, 5, 1)))
-TEMP_SUITE = list(map(lambda x: 10**x, range(-11, 10, 1)))
-COOL_SUITE = list(map(lambda x: x/100.0, range(0, 105, 5)))
-GA_POP_STE = range(20,220,20)
-GA_MATE_STE = range(20,GA_POP,20)
-GA_MUT_STE = range(20,GA_POP,10)
+ITERATION_SUITE = [10, 20, 50, 100, 200, 500, 1000, 2000]
+TEMP_SUITE = list(map(lambda x: 10**x, range(-10, 11, 2)))
+COOL_SUITE = list(map(lambda x: x/100.0, range(0, 105, 10)))
+GA_POP_STE = list(map(lambda x: 2**x, range(4, 9, 1)))
+GA_MATE_STE = range(GA_POP/5, GA_POP + 1, GA_POP/5)
+GA_MUT_STE  = range(GA_POP/5, GA_POP + 1, GA_POP/10)
 
 # CAN ONLY HANDLE 1 OUTPUT!!!
 try:
@@ -68,22 +68,28 @@ def initialize_instances(file_in):
     with open(file_in, "rU") as f_in:
         reader = csv.reader(f_in)
 
-        n_in = None
         if CSV_HEADER:
             _ = reader.next()
+        
+        rows = list(reader)
+        n_in = len(rows[0][:-1])
+        
+        response_set = set(map(lambda x: x[-1], rows))
+        resp_levels = sorted(response_set)
+        n_levels = len(resp_levels)
+        
+        n_parts = 2*n_levels
+        threshold = 1.0 / n_parts
+        new_levels = list(map(lambda x: float(x) / n_parts, range(1, n_parts, 2)))
+        level_map = dict(zip(resp_levels, new_levels))
+        # print(level_map)
     
-        for row in reader:
-            if not n_in:
-                n_in = len(row[:-1])
+        for row in rows:
             instance = Instance([float(value) for value in row[:-1]])
-            try:
-                instance.setLabel(Instance(float(row[-1])))
-            except:
-                print("Response variable must be numeric.")
-                return
+            instance.setLabel(Instance(level_map[row[-1]]))
             instances.append(instance)
 
-    return instances, n_in
+    return instances, n_in, threshold
 
 
 def train(oa, network, oaName, instances, measure, n_iterations):
@@ -148,10 +154,6 @@ def nn_test(csv_in, oa_name=None,
     file_in = os.path.join("..", "src", "opt", "test", csv_in)
     
 
-    networks = []  # BackPropagationNetwork
-    nnop = []  # NeuralNetworkOptimizationProblem
-    
-    oa = []  # OptimizationAlgorithm
     oa_names = ['RHC', 'SA', 'GA']
     if oa_name:
         assert oa_name in oa_names
@@ -175,13 +177,17 @@ def nn_test(csv_in, oa_name=None,
               'GA': {'algo': StandardGeneticAlgorithm,
                      'args': [ga_pop, ga_mate, ga_mut]}}
 
-    instances, input_layers = initialize_instances(file_in)
+    instances, input_layers, threshold = initialize_instances(file_in)
     factory = BackPropagationNetworkFactory()
     measure = SumOfSquaresError()
     data_set = DataSet(instances)
 
     for trial_num in range(1, NUM_TRIALS+1):
         results = ""
+
+        networks = []  # BackPropagationNetwork
+        nnop = []  # NeuralNetworkOptimizationProblem
+        oa = []  # OptimizationAlgorithm
     
         for i, oa_name in enumerate(oa_names):
             classification_network = factory.createClassificationNetwork([input_layers]+hidden_layers+[output_layers])
@@ -211,10 +217,10 @@ def nn_test(csv_in, oa_name=None,
                 networks[i].run()
                 
     
-                predicted = instance.getLabel().getContinuous()
-                actual = networks[i].getOutputValues().get(0)
+                actual = instance.getLabel().getContinuous()
+                predicted = networks[i].getOutputValues().get(0)
     
-                if abs(predicted - actual) < 0.5:
+                if abs(predicted - actual) < threshold:
                     correct += 1
                 else:
                     incorrect += 1
@@ -223,7 +229,8 @@ def nn_test(csv_in, oa_name=None,
             testing_time = end - start
             
             class_rate=float(correct)/(correct+incorrect)*100.0
-    
+            
+            
             results += "\nResults for %s: \nCorrectly classified %d instances." % (oa_name, correct)
             results += "\nIncorrectly classified %d instances.\nPercent correctly classified: %0.03f%%" % (incorrect, class_rate)
             results += "\nTraining time: %0.03f seconds" % (training_time,)
@@ -253,9 +260,10 @@ if __name__ == "__main__":
                             'classification_pct', 'training_time'])
 
     for level, num_iter in enumerate(ITERATION_SUITE):
-        nn_test(csv_file, n_iter=num_iter, tst_lbl='iteration_test', lvl_num = level)
+        nn_test(csv_file, n_iter=int(num_iter), tst_lbl='iteration_test', lvl_num = level,
+                sa_temp = 1E-10, sa_cool = 0.1)
     for level, temp in enumerate(TEMP_SUITE):
-        nn_test(csv_file, sa_temp=temp, oa_name="SA", tst_lbl='sa_temp_test', lvl_num = level)
+        nn_test(csv_file, sa_temp=temp, oa_name="SA", tst_lbl='sa_temp_test', lvl_num = level,)
     for level, cool in enumerate(COOL_SUITE):
         nn_test(csv_file, sa_cool=cool, oa_name="SA", tst_lbl='sa_cool_test', lvl_num = level)
     for level, parents in enumerate(GA_POP_STE):
